@@ -7,23 +7,22 @@ from telethon.sessions import StringSession
 from flask import Flask
 import threading
 
-# ===== ENV VARIABLES =====
+# ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
-# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK APP =====
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running"
 
-# ===== SCRAPER =====
+# ===== SMART SCRAPER =====
 def get_deals():
     print("🚀 Fetching deals...")
 
@@ -37,17 +36,65 @@ def get_deals():
 
         items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
 
-        for item in items[:5]:
+        for item in items[:10]:
             title = item.get_text(strip=True)
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            deals.append(f"🔥 {title}\n👉 {link}")
+            # 👉 Open product page
+            page = requests.get(link, headers=headers)
+            psoup = BeautifulSoup(page.text, "html.parser")
+
+            price_tag = psoup.select_one(".a-price-whole")
+            mrp_tag = psoup.select_one(".a-text-price span")
+            rating_tag = psoup.select_one(".a-icon-alt")
+            review_tag = psoup.select_one("#acrCustomerReviewText")
+
+            if not price_tag or not rating_tag or not review_tag:
+                continue
+
+            try:
+                price = int(price_tag.get_text(strip=True).replace(",", ""))
+                mrp = int(mrp_tag.get_text(strip=True).replace("₹", "").replace(",", "")) if mrp_tag else 0
+                rating = float(rating_tag.get_text().split()[0])
+                reviews = int(review_tag.get_text().split()[0].replace(",", ""))
+            except:
+                continue
+
+            # ===== DISCOUNT =====
+            if mrp > 0:
+                discount = int(((mrp - price) / mrp) * 100)
+            else:
+                continue
+
+            # ===== FILTERS =====
+            if rating < 4.0:
+                continue
+
+            if reviews < 500:
+                continue
+
+            if discount < 30:
+                continue
+
+            # ===== MESSAGE =====
+            msg = f"""🔥 REAL DEAL
+
+📦 {title}
+💰 ₹{price} (₹{mrp})
+🔥 {discount}% OFF
+⭐ {rating}
+📝 {reviews}
+
+👉 {link}
+"""
+
+            deals.append(msg)
 
     except Exception as e:
         print("Error:", e)
 
-    print("Deals:", len(deals))
+    print("Deals after filter:", len(deals))
     return deals
 
 # ===== BOT LOOP =====
@@ -61,27 +108,31 @@ async def bot_loop():
 
         deals = get_deals()
 
+        if not deals:
+            print("❌ No good deals found")
+
         for deal in deals:
-            await client.send_message(CHANNEL, deal)
-            print("✅ Sent")
-            await asyncio.sleep(5)
+            try:
+                await client.send_message(CHANNEL, deal)
+                print("✅ Sent")
+                await asyncio.sleep(5)
+            except Exception as e:
+                print("Send error:", e)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(1800)  # 30 minutes
+        await asyncio.sleep(1800)
 
-# ===== THREAD RUNNER =====
+# ===== THREAD =====
 def run_bot():
     print("THREAD STARTED")
     asyncio.run(bot_loop())
 
-# ===== MAIN START =====
+# ===== START =====
 if __name__ == "__main__":
     print("🔥 Starting system...")
 
-    # START BOT THREAD
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.start()
 
-    # START FLASK
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
