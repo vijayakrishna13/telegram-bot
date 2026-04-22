@@ -121,6 +121,11 @@ msg = f"""🔥 BEST DEAL
 🔥 {discount}% OFF
 """
 
+💰 Deal Price: ₹{price}
+🏷 MRP: ₹{mrp}
+🔥 {discount}% OFF
+"""
+
 if coupon_value > 0:
     msg += f"\n🎟 Coupon: ₹{coupon_value}"
 
