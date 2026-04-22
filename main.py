@@ -27,7 +27,7 @@ async def run_flask():
         app.run(host="0.0.0.0", port=10000)
     Thread(target=start).start()
 
-# ===== SCRAPER =====
+# ===== SCRAPER (SMART FILTER) =====
 def get_deals():
     print("🚀 Fetching deals...")
 
@@ -43,13 +43,49 @@ def get_deals():
 
         print(f"Products found: {len(items)}")
 
-        for item in items[:5]:
+        for item in items[:10]:
             title = item.get_text(strip=True)
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            msg = f"""🔥 Deal
+            # open product page
+            page = requests.get(link, headers=headers)
+            psoup = BeautifulSoup(page.text, "html.parser")
+
+            # ===== EXTRACT DATA =====
+            rating_tag = psoup.select_one(".a-icon-alt")
+            review_tag = psoup.select_one("#acrCustomerReviewText")
+            price_tag = psoup.select_one(".a-price-whole")
+
+            rating = rating_tag.get_text(strip=True) if rating_tag else ""
+            reviews = review_tag.get_text(strip=True) if review_tag else ""
+            price = price_tag.get_text(strip=True).replace(",", "") if price_tag else "0"
+
+            try:
+                rating_value = float(rating.split()[0])
+                review_count = int(reviews.split()[0].replace(",", ""))
+                price_value = int(price)
+            except:
+                continue
+
+            # ===== SMART FILTER =====
+            if rating_value < 4.0:
+                continue
+
+            if review_count < 500:
+                continue
+
+            if price_value == 0 or price_value > 50000:
+                continue
+
+            # ===== MESSAGE =====
+            msg = f"""🔥 Verified Deal
+
 📦 {title}
+💰 ₹{price_value}
+⭐ {rating}
+📝 {reviews}
+
 👉 {link}
 """
 
@@ -73,6 +109,9 @@ async def main():
     while True:
         deals = get_deals()
 
+        if not deals:
+            print("❌ No good deals found")
+
         for deal in deals:
             try:
                 print("📤 Sending...")
@@ -82,8 +121,8 @@ async def main():
             except Exception as e:
                 print("Send error:", e)
 
-        print("⏳ Waiting...")
-        await asyncio.sleep(300)  # 5 minutes for testing
+        print("⏳ Waiting 10 minutes...")
+        await asyncio.sleep(600)  # 10 min loop
 
 # ===== RUN =====
 if __name__ == "__main__":
