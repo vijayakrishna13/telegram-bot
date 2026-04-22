@@ -26,53 +26,60 @@ def home():
 def get_deals():
     print("🚀 Fetching deals...")
 
-    headers = {"User-Agent": "Mozilla/5.0"}
-    url = "https://www.amazon.in/gp/bestsellers/electronics/"
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    url = "https://www.amazon.in/deals"
     deals = []
 
     try:
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
+        links = soup.select("a[href*='/dp/']")
 
-        for item in items[:10]:
-            title = item.get_text(strip=True)
-            parent = item.find_parent("a")
-            link = "https://www.amazon.in" + parent["href"] if parent else ""
+        seen = set()
+
+        for link_tag in links[:10]:
+            href = link_tag.get("href")
+
+            if not href or href in seen:
+                continue
+
+            seen.add(href)
+
+            product_link = "https://www.amazon.in" + href.split("?")[0]
 
             # 👉 open product page
-            page = requests.get(link, headers=headers)
+            page = requests.get(product_link, headers=headers, timeout=10)
             psoup = BeautifulSoup(page.text, "html.parser")
 
-            # ===== BASIC DATA =====
+            title_tag = psoup.select_one("#productTitle")
             price_tag = psoup.select_one(".a-price-whole")
             mrp_tag = psoup.select_one(".a-text-price span")
             rating_tag = psoup.select_one(".a-icon-alt")
             review_tag = psoup.select_one("#acrCustomerReviewText")
 
-            if not price_tag or not rating_tag or not review_tag:
+            if not title_tag or not price_tag:
                 continue
 
             try:
-                price = int(price_tag.get_text(strip=True).replace(",", ""))
-                mrp = int(mrp_tag.get_text(strip=True).replace("₹", "").replace(",", "")) if mrp_tag else 0
-                rating = float(rating_tag.get_text().split()[0])
-                reviews = int(review_tag.get_text().split()[0].replace(",", ""))
+                title = title_tag.get_text(strip=True)
+                price = int(price_tag.get_text().replace(",", ""))
+                mrp = int(mrp_tag.get_text().replace("₹", "").replace(",", "")) if mrp_tag else 0
+
+                rating = float(rating_tag.get_text().split()[0]) if rating_tag else 0
+                reviews = int(review_tag.get_text().split()[0].replace(",", "")) if review_tag else 0
             except:
                 continue
 
-            # ===== DISCOUNT =====
-            if mrp > 0:
-                discount = int(((mrp - price) / mrp) * 100)
-            else:
+            if mrp == 0:
                 continue
 
-            # ===== FILTERS =====
-            if rating < 4.0:
-                continue
-            if reviews < 500:
-                continue
+            discount = int(((mrp - price) / mrp) * 100)
+
+            # ===== FILTER =====
             if discount < 20:
                 continue
 
@@ -88,14 +95,13 @@ def get_deals():
             if bank:
                 bank_text = bank.strip()
 
-            # ===== COPYWRITING MESSAGE =====
+            # ===== MESSAGE =====
             msg = f"""🔥 BEST DEAL
 
 📦 {title[:60]}...
 
 💰 ₹{price} (Worth ₹{mrp})
 🔥 {discount}% OFF
-⭐ {rating} | 📝 {reviews}
 """
 
             if coupon_text:
@@ -107,10 +113,9 @@ def get_deals():
             msg += f"""
 
 👉 Final price may drop further
-
 ⚡ Limited time deal
 
-👉 {link}
+👉 {product_link}
 """
 
             deals.append(msg)
@@ -118,7 +123,7 @@ def get_deals():
     except Exception as e:
         print("Error:", e)
 
-    print("Deals after filter:", len(deals))
+    print("Deals found:", len(deals))
     return deals
 
 # ===== BOT LOOP =====
@@ -128,12 +133,12 @@ async def bot_loop():
     await client.start()
 
     while True:
-        print("🔁 Running cycle...")
+        print("🔥 LOOP STARTED")
 
         deals = get_deals()
 
         if not deals:
-            print("❌ No good deals found")
+            print("❌ No deals found")
 
         for deal in deals:
             try:
