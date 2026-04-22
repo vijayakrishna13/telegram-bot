@@ -86,7 +86,7 @@ def get_deals():
 
 # ====== MAIN BOT LOOP ======
 async def main():
-    await client.start(phone=phone)
+    await client.start()
     print("🔥 Logged in")
 
     while True:
