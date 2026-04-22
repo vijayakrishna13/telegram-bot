@@ -13,6 +13,7 @@ API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
+# ===== TELEGRAM =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
 # ===== FLASK =====
@@ -49,34 +50,36 @@ def get_deals():
     print("Deals:", len(deals))
     return deals
 
-# ===== TELEGRAM =====
-async def send_deals():
-    deals = get_deals()
-
-    for deal in deals:
-        await client.send_message(CHANNEL, deal)
-        print("Sent")
-        await asyncio.sleep(5)
-
 # ===== BOT LOOP =====
 async def bot_loop():
-    print("🚀 Starting bot...")
+    print("🚀 BOT STARTED")
 
     await client.start()
 
     while True:
-        print("🔁 Cycle running...")
-        await send_deals()
+        print("🔁 Running cycle...")
+
+        deals = get_deals()
+
+        for deal in deals:
+            await client.send_message(CHANNEL, deal)
+            print("✅ Sent")
+            await asyncio.sleep(5)
+
         print("⏳ Sleeping...\n")
         await asyncio.sleep(1800)
 
-# ===== RUN BOT IN THREAD =====
-def start_bot():
+# ===== THREAD =====
+def run_bot():
     asyncio.run(bot_loop())
 
 # ===== START =====
 if __name__ == "__main__":
-    threading.Thread(target=start_bot).start()
+    print("🔥 Starting system...")
 
+    # START BOT THREAD FIRST
+    threading.Thread(target=run_bot, daemon=True).start()
+
+    # THEN START FLASK
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
