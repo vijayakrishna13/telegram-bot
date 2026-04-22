@@ -2,6 +2,8 @@ import asyncio
 import threading
 from flask import Flask
 from telethon import TelegramClient
+import requests
+from bs4 import BeautifulSoup
 
 # ===== TELEGRAM CONFIG =====
 api_id = 34165554
@@ -21,10 +23,39 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== YOUR LOGIC =====
+# ===== BESTSELLER SCRAPER =====
 def get_deals():
-    # temporary (replace later with Amazon scraping)
-    return ["🔥 FINAL TEST DEAL"]
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    categories = [
+        "https://www.amazon.in/gp/bestsellers/electronics/",
+        "https://www.amazon.in/gp/bestsellers/kitchen/",
+        "https://www.amazon.in/gp/bestsellers/fashion/",
+    ]
+
+    deals = []
+
+    for url in categories:
+        try:
+            response = requests.get(url, headers=headers)
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
+
+            for item in items[:5]:  # top 5 per category
+                title = item.get_text(strip=True)
+
+                parent = item.find_parent("a")
+                link = "https://www.amazon.in" + parent["href"] if parent else ""
+
+                message = f"🔥 Bestseller\n📦 {title}\n👉 {link}"
+
+                deals.append(message)
+
+        except:
+            continue
+
+    return deals
 
 # ===== TELEGRAM BOT =====
 async def run_bot():
@@ -34,7 +65,7 @@ async def run_bot():
     posted = set()
 
     while True:
-        print("🔍 Running your logic...")
+        print("🔍 Fetching bestseller products...")
 
         deals = get_deals()
 
@@ -44,7 +75,7 @@ async def run_bot():
                 posted.add(deal)
                 print("📤 Posted:", deal)
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(120)  # every 2 minutes
 
 # ===== MAIN =====
 def main():
