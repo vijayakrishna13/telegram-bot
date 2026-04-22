@@ -7,16 +7,16 @@ from telethon.sessions import StringSession
 from flask import Flask
 import threading
 
-# ===== ENV =====
+# ===== ENV VARIABLES =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
-# ===== TELEGRAM =====
+# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK =====
+# ===== FLASK APP =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -67,19 +67,21 @@ async def bot_loop():
             await asyncio.sleep(5)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(1800)
+        await asyncio.sleep(1800)  # 30 minutes
 
-# ===== THREAD =====
+# ===== THREAD RUNNER =====
 def run_bot():
+    print("THREAD STARTED")
     asyncio.run(bot_loop())
 
-# ===== START =====
+# ===== MAIN START =====
 if __name__ == "__main__":
     print("🔥 Starting system...")
 
-    # START BOT THREAD FIRST
-    threading.Thread(target=run_bot, daemon=True).start()
+    # START BOT THREAD
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
 
-    # THEN START FLASK
+    # START FLASK
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
