@@ -210,7 +210,8 @@ async def get_telegram_deals():
 async def bot_loop():
     print("BOT STARTED")
 
-    await client.start() log_deal("TEST123", "test")
+    await client.start() 
+    log_deal("TEST123", "test")
 
     while True:
         print("Running cycle...")
