@@ -4,21 +4,23 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 # ====== ENV VARIABLES ======
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
-channel = os.getenv("CHANNEL")
+API_ID = int(os.getenv(34165554))
+API_HASH = os.getenv("6879f17a50febfb32f9264b7300a8066")
+SESSION = os.getenv(1BVtsOKABu0z-PJ8voYBldMFZUdWTJpBsuKFcmFSBBmNkgKkeFzz4wQaPCKRA6W3bIxTt_Qe0YIKQMTQJqdaQCraT7LBcnIEFY603CIkgUBFTmmAG6bwC4pbwioVGqcZuVJWfjONFm3FA7HXlTgu5SToK8o3INEUTJtyIVcYTmWUstxEAok5XnA8SSzfh4bcGAIjB4q0wzUXqLV_FJ9aqIZFMlRRCT8ROuWj-dKJo8vTe56rUkN_obOovdlwe22b8LMEWX7iL2jk1eohgwvSt-NeYw615dhemHroQx0axXKFIU-hm85qVptVfOODCVVFGQgI2KAsWBFQXYts4LYeTZUpFhCktAlM=)
+CHANNEL = os.getenv(@loot_deals_india_vj)
 
-# ⚠️ IMPORTANT: no phone here
-client = TelegramClient("user_session", api_id, api_hash)
+# ====== TELEGRAM CLIENT (STRING SESSION) ======
+client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ====== FLASK (KEEP ALIVE) ======
+# ====== FLASK (KEEP RENDER ALIVE) ======
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot running"
+    return "Bot is running"
 
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
@@ -53,13 +55,13 @@ def get_deals():
                     page = requests.get(link, headers=headers, timeout=10)
                     psoup = BeautifulSoup(page.text, "html.parser")
 
-                    price = psoup.select_one(".a-price-whole")
-                    rating = psoup.select_one(".a-icon-alt")
-                    reviews = psoup.select_one("#acrCustomerReviewText")
+                    price_tag = psoup.select_one(".a-price-whole")
+                    rating_tag = psoup.select_one(".a-icon-alt")
+                    review_tag = psoup.select_one("#acrCustomerReviewText")
 
-                    price = price.get_text(strip=True) if price else "N/A"
-                    rating = rating.get_text(strip=True) if rating else "N/A"
-                    reviews = reviews.get_text(strip=True) if reviews else "N/A"
+                    price = price_tag.get_text(strip=True) if price_tag else "N/A"
+                    rating = rating_tag.get_text(strip=True) if rating_tag else "N/A"
+                    reviews = review_tag.get_text(strip=True) if review_tag else "N/A"
 
                     msg = f"""🔥 Bestseller
 📦 {title}
@@ -81,7 +83,7 @@ def get_deals():
 
 # ====== MAIN LOOP ======
 async def main():
-    await client.start()  # ✅ NO PHONE → NO OTP
+    await client.start()   # ✅ uses SESSION (no OTP)
     print("🔥 Logged in")
 
     while True:
@@ -90,7 +92,7 @@ async def main():
 
         for deal in deals:
             try:
-                await client.send_message(channel, deal)
+                await client.send_message(CHANNEL, deal)
                 print("✅ Sent")
                 await asyncio.sleep(5)
             except Exception as e:
