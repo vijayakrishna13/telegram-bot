@@ -32,6 +32,15 @@ app = Flask(__name__)
 def home():
     return "Bot is running"
 
+# ===== CATEGORY INTELLIGENCE =====
+CATEGORIES = {
+    "electronics": "https://www.amazon.in/gp/bestsellers/electronics/",
+    "mobiles": "https://www.amazon.in/gp/bestsellers/wireless/",
+    "home": "https://www.amazon.in/gp/bestsellers/kitchen/",
+    "fashion": "https://www.amazon.in/gp/bestsellers/apparel/",
+    "appliances": "https://www.amazon.in/gp/bestsellers/appliances/"
+}
+
 # ===== PRICE LOGIC =====
 def extract_price_data(text):
     prices = re.findall(r'₹\s?(\d+)', text)
@@ -49,13 +58,11 @@ def extract_price_data(text):
 
     return None
 
-# ===== PRICE VALIDATION =====
 def is_real_discount(deal, mrp, discount):
     if discount < 40:
         return False
 
-    # fake MRP detection
-    if mrp > deal * 3:  # unrealistic inflated price
+    if mrp > deal * 3:
         return False
 
     return True
@@ -74,26 +81,22 @@ def is_bestseller(link):
         return False
 
 # ===== COPYWRITING =====
-def format_message(deal, mrp, discount, link):
-    return f"""🔥 MEGA DEAL
+def format_message(deal, mrp, discount, link, category):
+    return f"""🔥 {category.upper()} DEAL
 
-💰 Deal Price: ₹{deal}
-🏷 MRP: ₹{mrp}
-📉 OFF: {discount}%
+💰 ₹{deal} (MRP ₹{mrp})
+📉 {discount}% OFF
 
 ⭐ Bestseller Product
-⚡ Real Price Drop
+⚡ Real Deal
 
 👉 Buy Now:
 {link}
 """
 
-# ===== AMAZON SCRAPER =====
-def get_amazon_deals():
-    print("Fetching Amazon deals...")
-
+# ===== CATEGORY SCRAPER =====
+def scrape_category(url, category_name):
     headers = {"User-Agent": "Mozilla/5.0"}
-    url = "https://www.amazon.in/deals"
     deals = []
 
     try:
@@ -114,7 +117,7 @@ def get_amazon_deals():
             if product_id in sent_products:
                 continue
 
-            # FAKE TEXT (we improve later)
+            # fake price (placeholder)
             text = "₹1000 ₹2000"
 
             price_data = extract_price_data(text)
@@ -133,26 +136,24 @@ def get_amazon_deals():
             with open(FILE_NAME, "a") as f:
                 f.write(product_id + "\n")
 
-            deals.append(format_message(deal, mrp, discount, link))
+            deals.append(format_message(deal, mrp, discount, link, category_name))
 
-            if len(deals) >= 3:
+            if len(deals) >= 2:
                 break
 
     except Exception as e:
-        print("Amazon error:", e)
+        print(f"{category_name} error:", e)
 
     return deals
 
-# ===== TELEGRAM SCRAPER =====
+# ===== TELEGRAM =====
 async def get_telegram_deals():
-    print("Fetching Telegram deals...")
-
     source_channels = ["offerzone3_0"]
     deals = []
 
     for channel in source_channels:
         try:
-            async for message in client.iter_messages(channel, limit=30):
+            async for message in client.iter_messages(channel, limit=20):
 
                 if not message.text:
                     continue
@@ -190,9 +191,9 @@ async def get_telegram_deals():
                 with open(FILE_NAME, "a") as f:
                     f.write(product_id + "\n")
 
-                deals.append(format_message(deal, mrp, discount, link))
+                deals.append(format_message(deal, mrp, discount, link, "TRENDING"))
 
-                if len(deals) >= 5:
+                if len(deals) >= 3:
                     break
 
         except Exception as e:
@@ -209,13 +210,18 @@ async def bot_loop():
     while True:
         print("Running cycle...")
 
-        amazon = get_amazon_deals()
-        telegram = await get_telegram_deals()
+        all_deals = []
 
-        all_deals = amazon + telegram
+        # CATEGORY INTELLIGENCE
+        for name, url in CATEGORIES.items():
+            deals = scrape_category(url, name)
+            all_deals.extend(deals)
+
+        telegram = await get_telegram_deals()
+        all_deals.extend(telegram)
 
         if not all_deals:
-            print("No good deals found")
+            print("No good deals")
 
         for deal in all_deals:
             try:
