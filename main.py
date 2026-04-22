@@ -32,6 +32,23 @@ app = Flask(__name__)
 def home():
     return "Bot is running"
 
+# ===== DISCOUNT CALC =====
+def calculate_discount(text):
+    prices = re.findall(r'₹\s?(\d+)', text)
+
+    if len(prices) >= 2:
+        try:
+            mrp = int(prices[1])
+            deal = int(prices[0])
+
+            if mrp > deal:
+                discount = int(((mrp - deal) / mrp) * 100)
+                return discount, deal, mrp
+        except:
+            return None
+
+    return None
+
 # ===== FILTER =====
 def is_good_deal(text):
     text = text.lower()
@@ -46,38 +63,38 @@ def is_good_deal(text):
     if any(word in text for word in bad_words):
         return False
 
-    price_match = re.search(r'₹\s?(\d+)', text)
-    if price_match:
-        price = int(price_match.group(1))
-        if price < 100:
+    discount_data = calculate_discount(text)
+
+    if discount_data:
+        discount, deal, mrp = discount_data
+        if discount < 30:
             return False
 
     return True
 
 # ===== COPYWRITING =====
 def format_message(text, link):
-    text = text.replace("\n", " ")
+    discount_data = calculate_discount(text)
 
-    price_match = re.search(r'₹\s?\d+', text)
-    price = price_match.group() if price_match else "Best Price"
+    if discount_data:
+        discount, deal, mrp = discount_data
 
-    if "loot" in text.lower():
-        hook = "🔥 LOOT DEAL"
-    elif "deal" in text.lower():
-        hook = "🔥 HOT DEAL"
-    else:
-        hook = "🔥 LIMITED OFFER"
+        msg = f"""🔥 MEGA DEAL
 
-    msg = f"""{hook}
+💰 Price: ₹{deal} (MRP ₹{mrp})
+📉 Discount: {discount}% OFF
 
-💰 Price: {price}
-
-⚡ Hurry! Limited time deal
+⚡ Limited Time Offer
 
 👉 Buy Now:
 {link}
 """
+    else:
+        msg = f"""🔥 HOT DEAL
 
+👉 Buy Now:
+{link}
+"""
     return msg
 
 # ===== AMAZON =====
@@ -110,7 +127,7 @@ def get_amazon_deals():
             with open(FILE_NAME, "a") as f:
                 f.write(product_id + "\n")
 
-            formatted = format_message("amazon deal", link)
+            formatted = format_message("amazon deal ₹1000 ₹2000", link)
             deals.append(formatted)
 
             if len(deals) >= 3:
@@ -125,7 +142,7 @@ def get_amazon_deals():
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
-    source_channels = ["offerzone3_0"]
+    source_channels = ["offerzone3_0"]  # ensure you joined this
     deals = []
 
     for channel in source_channels:
