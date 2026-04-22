@@ -7,6 +7,7 @@ from telethon.sessions import StringSession
 from flask import Flask
 import threading
 import re
+import datetime
 
 # ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
@@ -18,12 +19,14 @@ AFFILIATE_TAG = "lootdealsvj21-21"
 
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== STORAGE =====
-FILE_NAME = "sent.txt"
+# ===== FILES =====
+SENT_FILE = "sent.txt"
+LOG_FILE = "analytics.txt"
+
 sent_products = set()
 
-if os.path.exists(FILE_NAME):
-    with open(FILE_NAME, "r") as f:
+if os.path.exists(SENT_FILE):
+    with open(SENT_FILE, "r") as f:
         for line in f:
             sent_products.add(line.strip())
 
@@ -32,59 +35,45 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running"
+    return "Bot running"
 
-# ===== CATEGORY =====
-CATEGORIES = {
-    "electronics": "https://www.amazon.in/gp/bestsellers/electronics/",
-    "mobiles": "https://www.amazon.in/gp/bestsellers/wireless/",
-    "home": "https://www.amazon.in/gp/bestsellers/kitchen/",
-    "fashion": "https://www.amazon.in/gp/bestsellers/apparel/",
-}
+# ===== ANALYTICS =====
+def log_deal(product_id, category):
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    with open(LOG_FILE, "a") as f:
+        f.write(f"{time_now} | {category} | {product_id}\n")
 
 # ===== PRICE =====
 def extract_price_data(text):
     prices = re.findall(r'₹\s?(\d+)', text)
 
     if len(prices) >= 2:
-        try:
-            deal = int(prices[0])
-            mrp = int(prices[1])
+        deal = int(prices[0])
+        mrp = int(prices[1])
 
-            if mrp > deal:
-                discount = int(((mrp - deal) / mrp) * 100)
-                return deal, mrp, discount
-        except:
-            return None
+        if mrp > deal:
+            discount = int(((mrp - deal) / mrp) * 100)
+            return deal, mrp, discount
 
     return None
 
 def is_real_discount(deal, mrp, discount):
-    if discount < 40:
-        return False
-    if mrp > deal * 3:
-        return False
-    return True
+    return discount >= 40 and mrp < deal * 3
 
 # ===== AFFILIATE =====
 def make_affiliate(link):
     if "tag=" in link:
         return link
-
     if "?" in link:
         return link + f"&tag={AFFILIATE_TAG}"
-    else:
-        return link + f"?tag={AFFILIATE_TAG}"
+    return link + f"?tag={AFFILIATE_TAG}"
 
 # ===== BESTSELLER =====
 def is_bestseller(link):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(link, headers=headers, timeout=10)
-        html = res.text.lower()
-
-        keywords = ["best seller", "#1", "bestseller"]
-        return any(k in html for k in keywords)
+        html = requests.get(link, headers={"User-Agent": "Mozilla"}, timeout=10).text.lower()
+        return any(k in html for k in ["best seller", "#1", "bestseller"])
     except:
         return False
 
@@ -92,30 +81,35 @@ def is_bestseller(link):
 def format_message(deal, mrp, discount, link, category):
     link = make_affiliate(link)
 
-    return f"""🔥 {category.upper()} DEAL
+    return f"""🔥 {discount}% OFF – {category.upper()} DEAL
 
 💰 ₹{deal} (MRP ₹{mrp})
-📉 {discount}% OFF
+📉 Save ₹{mrp - deal}
 
 ⭐ Bestseller Product
-⚡ Limited Time Offer
+⚡ Limited Time Deal
 
 👉 Buy Now:
 {link}
 """
 
-# ===== CATEGORY SCRAPER =====
+# ===== AMAZON =====
+CATEGORIES = {
+    "electronics": "https://www.amazon.in/gp/bestsellers/electronics/",
+    "mobiles": "https://www.amazon.in/gp/bestsellers/wireless/",
+    "home": "https://www.amazon.in/gp/bestsellers/kitchen/",
+}
+
 def scrape_category(url, category):
-    headers = {"User-Agent": "Mozilla/5.0"}
     deals = []
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(res.text, "html.parser")
+        soup = BeautifulSoup(
+            requests.get(url, headers={"User-Agent": "Mozilla"}, timeout=10).text,
+            "html.parser"
+        )
 
-        links = soup.find_all("a", href=True)
-
-        for a in links:
+        for a in soup.find_all("a", href=True):
             href = a["href"]
 
             if "/dp/" not in href:
@@ -127,13 +121,14 @@ def scrape_category(url, category):
             if product_id in sent_products:
                 continue
 
-            text = "₹1000 ₹2000"  # placeholder
+            # TEMP price (later improve)
+            text = "₹1000 ₹2000"
 
-            price_data = extract_price_data(text)
-            if not price_data:
+            data = extract_price_data(text)
+            if not data:
                 continue
 
-            deal, mrp, discount = price_data
+            deal, mrp, discount = data
 
             if not is_real_discount(deal, mrp, discount):
                 continue
@@ -142,8 +137,11 @@ def scrape_category(url, category):
                 continue
 
             sent_products.add(product_id)
-            with open(FILE_NAME, "a") as f:
+            with open(SENT_FILE, "a") as f:
                 f.write(product_id + "\n")
+
+            # 🔥 ANALYTICS HERE
+            log_deal(product_id, category)
 
             deals.append(format_message(deal, mrp, discount, link, category))
 
@@ -151,59 +149,60 @@ def scrape_category(url, category):
                 break
 
     except Exception as e:
-        print("Error:", e)
+        print("Amazon error:", e)
 
     return deals
 
 # ===== TELEGRAM =====
 async def get_telegram_deals():
-    source_channels = ["offerzone3_0"]
     deals = []
 
-    for channel in source_channels:
-        try:
-            async for message in client.iter_messages(channel, limit=20):
+    try:
+        async for msg in client.iter_messages("offerzone3_0", limit=20):
 
-                if not message.text:
-                    continue
+            if not msg.text:
+                continue
 
-                links = re.findall(r'https?://\S+', message.text)
-                if not links:
-                    continue
+            links = re.findall(r'https?://\S+', msg.text)
+            if not links:
+                continue
 
-                link = links[0]
+            link = links[0]
 
-                if "/dp/" not in link:
-                    continue
+            if "/dp/" not in link:
+                continue
 
-                product_id = link.split("/dp/")[1].split("/")[0]
+            product_id = link.split("/dp/")[1].split("/")[0]
 
-                if product_id in sent_products:
-                    continue
+            if product_id in sent_products:
+                continue
 
-                price_data = extract_price_data(message.text)
-                if not price_data:
-                    continue
+            data = extract_price_data(msg.text)
+            if not data:
+                continue
 
-                deal, mrp, discount = price_data
+            deal, mrp, discount = data
 
-                if not is_real_discount(deal, mrp, discount):
-                    continue
+            if not is_real_discount(deal, mrp, discount):
+                continue
 
-                if not is_bestseller(link):
-                    continue
+            if not is_bestseller(link):
+                continue
 
-                sent_products.add(product_id)
-                with open(FILE_NAME, "a") as f:
-                    f.write(product_id + "\n")
+            sent_products.add(product_id)
+            with open(SENT_FILE, "a") as f:
+                f.write(product_id + "\n")
 
-                deals.append(format_message(deal, mrp, discount, link, "TRENDING"))
+            # 🔥 ANALYTICS HERE
+            log_deal(product_id, "telegram")
 
-                if len(deals) >= 3:
-                    break
+            deals.append(format_message(deal, mrp, discount, link, "TRENDING"))
 
-        except Exception as e:
-            print("Telegram error:", e)
+            if len(deals) >= 3:
+                break
+
+    except Exception as e:
+        print("Telegram error:", e)
 
     return deals
 
@@ -219,11 +218,9 @@ async def bot_loop():
         all_deals = []
 
         for name, url in CATEGORIES.items():
-            deals = scrape_category(url, name)
-            all_deals.extend(deals)
+            all_deals.extend(scrape_category(url, name))
 
-        telegram = await get_telegram_deals()
-        all_deals.extend(telegram)
+        all_deals.extend(await get_telegram_deals())
 
         for deal in all_deals:
             try:
@@ -236,11 +233,10 @@ async def bot_loop():
         print("Sleeping...\n")
         await asyncio.sleep(1800)
 
-# ===== THREAD =====
+# ===== MAIN =====
 def run_bot():
     asyncio.run(bot_loop())
 
-# ===== MAIN =====
 if __name__ == "__main__":
     print("Starting system...")
 
