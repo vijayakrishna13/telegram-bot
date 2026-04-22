@@ -5,24 +5,24 @@ from bs4 import BeautifulSoup
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from flask import Flask
+import threading
 
-# ===== ENV VARIABLES =====
+# ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
-# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK (KEEP RENDER ALIVE) =====
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running"
 
-# ===== DEAL SCRAPER =====
+# ===== SCRAPER =====
 def get_deals():
     print("🚀 Fetching deals...")
 
@@ -46,40 +46,37 @@ def get_deals():
     except Exception as e:
         print("Error:", e)
 
-    print(f"Deals found: {len(deals)}")
+    print("Deals:", len(deals))
     return deals
 
-# ===== SEND TO TELEGRAM =====
+# ===== TELEGRAM =====
 async def send_deals():
     deals = get_deals()
 
-    if not deals:
-        print("No deals found")
-        return
-
     for deal in deals:
         await client.send_message(CHANNEL, deal)
-        print("Sent:", deal[:30])
+        print("Sent")
         await asyncio.sleep(5)
 
-# ===== MAIN LOOP =====
-async def main():
+# ===== BOT LOOP =====
+async def bot_loop():
     print("🚀 Starting bot...")
 
     await client.start()
 
     while True:
-        print("🔁 Running cycle...")
-
+        print("🔁 Cycle running...")
         await send_deals()
+        print("⏳ Sleeping...\n")
+        await asyncio.sleep(1800)
 
-        print("⏳ Waiting 30 minutes...\n")
-        await asyncio.sleep(1800)  # 30 minutes
+# ===== RUN BOT IN THREAD =====
+def start_bot():
+    asyncio.run(bot_loop())
 
 # ===== START =====
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
+    threading.Thread(target=start_bot).start()
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
