@@ -7,15 +7,15 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 # ===== ENV VARIABLES =====
-API_ID = int(os.getenv("34165554"))
-API_HASH = os.getenv("6879f17a50febfb32f9264b7300a8066")
-SESSION = os.getenv("1BVtsOKABu0z-PJ8voYBldMFZUdWTJpBsuKFcmFSBBmNkgKkeFzz4wQaPCKRA6W3bIxTt_Qe0YIKQMTQJqdaQCraT7LBcnIEFY603CIkgUBFTmmAG6bwC4pbwioVGqcZuVJWfjONFm3FA7HXlTgu5SToK8o3INEUTJtyIVcYTmWUstxEAok5XnA8SSzfh4bcGAIjB4q0wzUXqLV_FJ9aqIZFMlRRCT8ROuWj-dKJo8vTe56rUkN_obOovdlwe22b8LMEWX7iL2jk1eohgwvSt-NeYw615dhemHroQx0axXKFIU-hm85qVptVfOODCVVFGQgI2KAsWBFQXYts4LYeTZUpFhCktAlM=")
-CHANNEL = os.getenv("@loot_deals_india_vj")
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
+CHANNEL = os.getenv("CHANNEL")
 
 # ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK (for Render) =====
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -28,7 +28,6 @@ def run_flask():
 # ===== SCRAPER =====
 def get_deals():
     headers = {"User-Agent": "Mozilla/5.0"}
-
     url = "https://www.amazon.in/gp/bestsellers/electronics/"
     deals = []
 
@@ -40,7 +39,6 @@ def get_deals():
 
         for item in items[:5]:
             title = item.get_text(strip=True)
-
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
@@ -57,7 +55,7 @@ def get_deals():
 
 # ===== MAIN LOOP =====
 async def main():
-    await client.start()   # uses SESSION (no OTP)
+    await client.start()
     print("🔥 Logged in")
 
     while True:
