@@ -113,8 +113,8 @@ def run_bot():
 if __name__ == "__main__":
     print("🔥 Starting system...")
 
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
+    loop = asyncio.get_event_loop()
+    loop.create_task(bot_loop())
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
