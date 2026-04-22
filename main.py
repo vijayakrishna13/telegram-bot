@@ -25,8 +25,10 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== SMART DEAL SCRAPER =====
+# ===== SCRAPER =====
 def get_deals():
+    print("🚀 Fetching deals...")
+
     headers = {"User-Agent": "Mozilla/5.0"}
     url = "https://www.amazon.in/gp/bestsellers/electronics/"
     deals = []
@@ -37,12 +39,14 @@ def get_deals():
 
         items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
 
+        print(f"Products found: {len(items)}")
+
         for item in items[:10]:
             title = item.get_text(strip=True)
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            # visit product page
+            # open product page
             page = requests.get(link, headers=headers)
             psoup = BeautifulSoup(page.text, "html.parser")
 
@@ -58,13 +62,13 @@ def get_deals():
             except:
                 continue
 
-            # ✅ SMART FILTERS
-            if rating_value < 4.0:
+            # 🔥 TEMP RELAXED FILTERS (important)
+            if rating_value < 3.5:
                 continue
-            if review_count < 1000:
+            if review_count < 100:
                 continue
 
-            msg = f"""🔥 Real Deal
+            msg = f"""🔥 Deal
 📦 {title}
 ⭐ {rating}
 📝 {reviews}
@@ -76,23 +80,28 @@ def get_deals():
     except Exception as e:
         print("Scraping error:", e)
 
+    print(f"Deals ready: {len(deals)}")
     return deals
 
-# ===== MAIN LOOP =====
+# ===== MAIN =====
 async def main():
     await client.start()
-    print("🔥 Logged in")
+    print("🔥 Logged in successfully")
 
     while True:
         deals = get_deals()
 
+        if not deals:
+            print("❌ No deals found")
+
         for deal in deals:
             try:
+                print("📤 Sending deal...")
                 await client.send_message(CHANNEL, deal)
                 print("✅ Sent")
                 await asyncio.sleep(5)
             except Exception as e:
-                print("Error:", e)
+                print("Send error:", e)
 
         print("⏳ Waiting 1 hour...")
         await asyncio.sleep(3600)
