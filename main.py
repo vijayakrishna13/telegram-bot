@@ -7,115 +7,50 @@ from telethon.sessions import StringSession
 from flask import Flask
 import threading
 
-# ===== ENV =====
+# ===== ENV VARIABLES =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
+# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK =====
+# ===== FLASK APP =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running"
 
-# ===== REAL DEAL FETCH =====
+# ===== STORE SENT DEALS (avoid duplicates) =====
+sent_deals = set()
+
+# ===== SCRAPER =====
 def get_deals():
-    print("🚀 Fetching real deals...")
+    print("🚀 Fetching deals...")
 
     headers = {"User-Agent": "Mozilla/5.0"}
+    url = "https://www.amazon.in/gp/bestsellers/electronics/"
     deals = []
 
     try:
-        url = "https://www.amazon.in/deals"
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        links = soup.select("a[href*='/dp/']")
-        seen = set()
+        items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
 
-        for tag in links:
-            href = tag.get("href")
+        for item in items[:5]:
+            title = item.get_text(strip=True)
+            parent = item.find_parent("a")
+            link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            if not href:
-                continue
+            message = f"🔥 {title}\n👉 {link}"
 
-            link = "https://www.amazon.in" + href.split("?")[0]
-
-            if link in seen:
-                continue
-
-            seen.add(link)
-
-            # 👉 open product page
-            page = requests.get(link, headers=headers, timeout=10)
-            psoup = BeautifulSoup(page.text, "html.parser")
-
-            title_tag = psoup.select_one("#productTitle")
-            price_tag = psoup.select_one(".a-price-whole")
-            mrp_tag = psoup.select_one(".a-text-price span")
-
-            if not title_tag or not price_tag or not mrp_tag:
-                continue
-
-            try:
-                title = title_tag.get_text(strip=True)
-                price = int(price_tag.get_text().replace(",", ""))
-                mrp = int(mrp_tag.get_text().replace("₹", "").replace(",", ""))
-            except:
-                continue
-
-            if mrp == 0:
-                continue
-
-            discount = int(((mrp - price) / mrp) * 100)
-
-            # ===== FILTER =====
-            if discount < 30:
-                continue
-
-            # ===== COUPON =====
-            coupon_text = ""
-            coupon = psoup.find(string=lambda x: x and "coupon" in x.lower())
-            if coupon:
-                coupon_text = coupon.strip()
-
-            # ===== BANK =====
-            bank_text = ""
-            bank = psoup.find(string=lambda x: x and "bank" in x.lower())
-            if bank:
-                bank_text = bank.strip()
-
-            # ===== COPYWRITING =====
-            msg = f"""🔥 BEST DEAL
-
-📦 {title[:60]}...
-
-💰 ₹{price} (Worth ₹{mrp})
-🔥 {discount}% OFF
-"""
-
-            if coupon_text:
-                msg += f"\n🎟 {coupon_text}"
-
-            if bank_text:
-                msg += f"\n🏦 {bank_text}"
-
-            msg += f"""
-
-👉 Final price may drop further
-⚡ Limited time deal
-
-👉 {link}
-"""
-
-            deals.append(msg)
-
-            if len(deals) >= 5:
-                break
+            # avoid duplicates
+            if message not in sent_deals:
+                deals.append(message)
+                sent_deals.add(message)
 
     except Exception as e:
         print("Error:", e)
@@ -130,30 +65,30 @@ async def bot_loop():
     await client.start()
 
     while True:
-        print("🔥 LOOP STARTED")
+        print("🔁 Running cycle...")
+
+        # DEBUG (you can remove later)
+        await client.send_message(CHANNEL, "🔁 BOT RUNNING")
 
         deals = get_deals()
 
         if not deals:
-            print("❌ No deals found")
+            print("No new deals")
 
         for deal in deals:
-            try:
-                await client.send_message(CHANNEL, deal)
-                print("✅ Sent")
-                await asyncio.sleep(5)
-            except Exception as e:
-                print("Send error:", e)
+            await client.send_message(CHANNEL, deal)
+            print("✅ Sent")
+            await asyncio.sleep(5)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(60)
+        await asyncio.sleep(1800)  # 30 minutes
 
-# ===== THREAD =====
+# ===== THREAD RUNNER =====
 def run_bot():
     print("THREAD STARTED")
     asyncio.run(bot_loop())
 
-# ===== START =====
+# ===== MAIN =====
 if __name__ == "__main__":
     print("🔥 Starting system...")
 
