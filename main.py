@@ -77,30 +77,40 @@ def get_deals():
 async def bot_loop():
     print("🚀 BOT STARTED")
 
-    await client.start()
+    try:
+        await client.start()
+        print("✅ Telegram connected")
+
+    except Exception as e:
+        print("❌ Client start error:", e)
+        return  # stop here if failed
 
     while True:
-        print("🔁 Running cycle...")
+        try:
+            print("🔁 Running cycle...")
 
-        deals = get_deals()
+            deals = get_deals()
 
-        if not deals:
-            print("⚠️ No deals found")
+            print("Deals found:", len(deals))
 
-        for msg, pid, cat, price, discount in deals:
-            try:
-                await client.send_message(CHANNEL, msg)
-                print("✅ Sent")
+            for msg, pid, cat, price, discount in deals:
+                try:
+                    await client.send_message(CHANNEL, msg)
+                    print("✅ Sent")
 
-                log_deal(pid, cat, price, discount)
+                    log_deal(pid, cat, price, discount)
 
-                await asyncio.sleep(5)
+                    await asyncio.sleep(5)
 
-            except Exception as e:
-                print("Send error:", e)
+                except Exception as e:
+                    print("❌ Send error:", e)
 
-        print("⏳ Sleeping...\n")
-        await asyncio.sleep(600)  # 10 min (for testing)
+            print("⏳ Sleeping...\n")
+            await asyncio.sleep(600)
+
+        except Exception as e:
+            print("❌ Loop error:", e)
+            await asyncio.sleep(10)
 
 # ===== RUN BOT SAFELY =====
 def start_bot():
