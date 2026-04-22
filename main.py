@@ -8,7 +8,7 @@ BOT_TOKEN = "AAE0xs3TcGr-Zz8eDYrAhOsnxqfn455jJM0"
 SOURCE_CHANNEL = "loot_deals"
 TARGET_CHANNEL = "loot_deals_india_vj"
 
-client = TelegramClient(None, api_id, api_hash)
+client = TelegramClient("bot_session", api_id, api_hash)
 
 async def main():
     print("✅ Bot started...")
