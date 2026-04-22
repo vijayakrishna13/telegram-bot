@@ -45,7 +45,12 @@ def extract_data(text):
 
 # ================== MAIN BOT ==================
 async def main():
-    await client.connect()
+    await client.start()
+
+    if not await client.is_user_authorized():
+        print("❌ Session not authorized")
+        return
+
     print("✅ Bot started")
 
     entity = await client.get_entity(TARGET_CHANNEL)
