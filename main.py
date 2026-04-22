@@ -16,11 +16,10 @@ CHANNEL = os.getenv("CHANNEL")
 
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FILE STORAGE =====
+# ===== STORAGE =====
 FILE_NAME = "sent.txt"
 sent_products = set()
 
-# load old products
 if os.path.exists(FILE_NAME):
     with open(FILE_NAME, "r") as f:
         for line in f:
@@ -33,7 +32,7 @@ app = Flask(__name__)
 def home():
     return "Bot is running"
 
-# ===== SMART FILTER =====
+# ===== FILTER =====
 def is_good_deal(text):
     text = text.lower()
 
@@ -55,7 +54,33 @@ def is_good_deal(text):
 
     return True
 
-# ===== AMAZON SCRAPER =====
+# ===== COPYWRITING =====
+def format_message(text, link):
+    text = text.replace("\n", " ")
+
+    price_match = re.search(r'₹\s?\d+', text)
+    price = price_match.group() if price_match else "Best Price"
+
+    if "loot" in text.lower():
+        hook = "🔥 LOOT DEAL"
+    elif "deal" in text.lower():
+        hook = "🔥 HOT DEAL"
+    else:
+        hook = "🔥 LIMITED OFFER"
+
+    msg = f"""{hook}
+
+💰 Price: {price}
+
+⚡ Hurry! Limited time deal
+
+👉 Buy Now:
+{link}
+"""
+
+    return msg
+
+# ===== AMAZON =====
 def get_amazon_deals():
     print("Fetching Amazon deals...")
 
@@ -76,18 +101,17 @@ def get_amazon_deals():
                 continue
 
             link = "https://www.amazon.in" + href.split("?")[0]
-
             product_id = link.split("/dp/")[1].split("/")[0]
 
             if product_id in sent_products:
                 continue
 
-            # save
             sent_products.add(product_id)
             with open(FILE_NAME, "a") as f:
                 f.write(product_id + "\n")
 
-            deals.append(f"🔥 Amazon Deal\n👉 {link}")
+            formatted = format_message("amazon deal", link)
+            deals.append(formatted)
 
             if len(deals) >= 3:
                 break
@@ -97,11 +121,11 @@ def get_amazon_deals():
 
     return deals
 
-# ===== TELEGRAM SCRAPER =====
+# ===== TELEGRAM =====
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
-    source_channels = ["offerzone3_0"]  # change if needed
+    source_channels = ["offerzone3_0"]
     deals = []
 
     for channel in source_channels:
@@ -128,12 +152,12 @@ async def get_telegram_deals():
                 if product_id in sent_products:
                     continue
 
-                # save
                 sent_products.add(product_id)
                 with open(FILE_NAME, "a") as f:
                     f.write(product_id + "\n")
 
-                deals.append(message.text[:400])
+                formatted = format_message(message.text, link)
+                deals.append(formatted)
 
                 if len(deals) >= 5:
                     break
@@ -143,7 +167,7 @@ async def get_telegram_deals():
 
     return deals
 
-# ===== BOT LOOP =====
+# ===== LOOP =====
 async def bot_loop():
     print("BOT STARTED")
 
