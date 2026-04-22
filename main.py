@@ -85,7 +85,56 @@ def get_deals():
                 bank_text = bank.strip()
 
             # ===== MESSAGE =====
-            msg = f"""🔥 BEST DEAL
+            # ===== EXTRACT COUPON AMOUNT =====
+coupon_value = 0
+if coupon_text:
+    import re
+    match = re.search(r'₹\s?(\d+)', coupon_text)
+    if match:
+        coupon_value = int(match.group(1))
+
+# ===== EXTRACT BANK % =====
+bank_percent = 0
+if bank_text:
+    import re
+    match = re.search(r'(\d+)%', bank_text)
+    if match:
+        bank_percent = int(match.group(1))
+
+# ===== FINAL PRICE CALC =====
+final_price = price
+
+# apply coupon
+final_price -= coupon_value
+
+# apply bank discount
+if bank_percent > 0:
+    final_price -= int(final_price * bank_percent / 100)
+
+# ===== MESSAGE =====
+msg = f"""🔥 BEST DEAL
+
+📦 {title[:60]}...
+
+💰 Deal Price: ₹{price}
+🏷 MRP: ₹{mrp}
+🔥 {discount}% OFF
+"""
+
+if coupon_value > 0:
+    msg += f"\n🎟 Coupon: ₹{coupon_value}"
+
+if bank_percent > 0:
+    msg += f"\n🏦 Bank: {bank_percent}% OFF"
+
+msg += f"""
+
+💸 FINAL PRICE: ₹{final_price} ✅
+
+⚡ Limited time deal
+
+👉 {link}
+"""
 
 📦 {title[:60]}...
 
