@@ -8,24 +8,30 @@ from flask import Flask
 import threading
 import re
 
-# ===== ENV VARIABLES =====
+# ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
-# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK (RENDER KEEP ALIVE) =====
+# ===== FILE STORAGE =====
+FILE_NAME = "sent.txt"
+sent_products = set()
+
+# load old products
+if os.path.exists(FILE_NAME):
+    with open(FILE_NAME, "r") as f:
+        for line in f:
+            sent_products.add(line.strip())
+
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running"
-
-# ===== MEMORY =====
-sent_products = set()
 
 # ===== SMART FILTER =====
 def is_good_deal(text):
@@ -76,7 +82,10 @@ def get_amazon_deals():
             if product_id in sent_products:
                 continue
 
+            # save
             sent_products.add(product_id)
+            with open(FILE_NAME, "a") as f:
+                f.write(product_id + "\n")
 
             deals.append(f"🔥 Amazon Deal\n👉 {link}")
 
@@ -92,8 +101,7 @@ def get_amazon_deals():
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
-    source_channels = ["offerzone3_0"]  # ← update if needed
-
+    source_channels = ["offerzone3_0"]  # change if needed
     deals = []
 
     for channel in source_channels:
@@ -120,11 +128,12 @@ async def get_telegram_deals():
                 if product_id in sent_products:
                     continue
 
+                # save
                 sent_products.add(product_id)
+                with open(FILE_NAME, "a") as f:
+                    f.write(product_id + "\n")
 
-                clean_msg = message.text[:400]
-
-                deals.append(clean_msg)
+                deals.append(message.text[:400])
 
                 if len(deals) >= 5:
                     break
@@ -160,7 +169,7 @@ async def bot_loop():
                 print("Send error:", e)
 
         print("Sleeping...\n")
-        await asyncio.sleep(1800)  # 30 min
+        await asyncio.sleep(1800)
 
 # ===== THREAD =====
 def run_bot():
