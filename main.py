@@ -5,30 +5,29 @@ from bs4 import BeautifulSoup
 from flask import Flask
 from telethon import TelegramClient
 
-# ====== YOUR CREDENTIALS ======
+# ====== ENV VARIABLES ======
 api_id = int(os.getenv("API_ID"))
 api_hash = os.getenv("API_HASH")
-phone = os.getenv("PHONE")
-channel = os.getenv("CHANNEL")  # your Telegram channel username
+channel = os.getenv("CHANNEL")
 
-# ====== TELEGRAM CLIENT ======
-client = TelegramClient("session", api_id, api_hash)
+# ⚠️ IMPORTANT: no phone here
+client = TelegramClient("user_session", api_id, api_hash)
 
-# ====== FLASK (RENDER KEEP ALIVE) ======
+# ====== FLASK (KEEP ALIVE) ======
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running"
+    return "Bot running"
 
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ====== SCRAPER ======
+# ====== AMAZON SCRAPER ======
 def get_deals():
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    categories = [
+    urls = [
         "https://www.amazon.in/gp/bestsellers/electronics/",
         "https://www.amazon.in/gp/bestsellers/kitchen/",
         "https://www.amazon.in/gp/bestsellers/fashion/",
@@ -36,37 +35,33 @@ def get_deals():
 
     deals = []
 
-    for url in categories:
+    for url in urls:
         try:
-            response = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.text, "html.parser")
+            res = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(res.text, "html.parser")
 
             items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
 
-            for item in items[:3]:  # keep low to avoid block
+            for item in items[:3]:
                 try:
                     title = item.get_text(strip=True)
 
                     parent = item.find_parent("a")
                     link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-                    # 👉 Visit product page
-                    product_page = requests.get(link, headers=headers, timeout=10)
-                    product_soup = BeautifulSoup(product_page.text, "html.parser")
+                    # visit product page
+                    page = requests.get(link, headers=headers, timeout=10)
+                    psoup = BeautifulSoup(page.text, "html.parser")
 
-                    # Price
-                    price_tag = product_soup.select_one(".a-price-whole")
-                    price = price_tag.get_text(strip=True) if price_tag else "N/A"
+                    price = psoup.select_one(".a-price-whole")
+                    rating = psoup.select_one(".a-icon-alt")
+                    reviews = psoup.select_one("#acrCustomerReviewText")
 
-                    # Rating
-                    rating_tag = product_soup.select_one(".a-icon-alt")
-                    rating = rating_tag.get_text(strip=True) if rating_tag else "N/A"
+                    price = price.get_text(strip=True) if price else "N/A"
+                    rating = rating.get_text(strip=True) if rating else "N/A"
+                    reviews = reviews.get_text(strip=True) if reviews else "N/A"
 
-                    # Reviews
-                    review_tag = product_soup.select_one("#acrCustomerReviewText")
-                    reviews = review_tag.get_text(strip=True) if review_tag else "N/A"
-
-                    message = f"""🔥 Bestseller
+                    msg = f"""🔥 Bestseller
 📦 {title}
 💰 ₹{price}
 ⭐ {rating}
@@ -74,19 +69,19 @@ def get_deals():
 👉 {link}
 """
 
-                    deals.append(message)
+                    deals.append(msg)
 
-                except Exception as e:
+                except:
                     continue
 
-        except Exception as e:
+        except:
             continue
 
     return deals
 
-# ====== MAIN BOT LOOP ======
+# ====== MAIN LOOP ======
 async def main():
-    await client.start()
+    await client.start()  # ✅ NO PHONE → NO OTP
     print("🔥 Logged in")
 
     while True:
@@ -104,7 +99,7 @@ async def main():
         print("⏳ Waiting 1 hour...\n")
         await asyncio.sleep(3600)
 
-# ====== RUN BOTH ======
+# ====== RUN ======
 if __name__ == "__main__":
     import threading
     threading.Thread(target=run_flask).start()
