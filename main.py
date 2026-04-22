@@ -29,12 +29,6 @@ def log_deal(product_id, category, price, discount):
     entry = f"{datetime.now()} | {category} | {product_id} | ₹{price} | {discount}%"
     print("📊 LOG:", entry)
 
-    try:
-        with open("analytics.txt", "a") as f:
-            f.write(entry + "\n")
-    except Exception as e:
-        print("Log error:", e)
-
 # ===== SCRAPER =====
 def get_deals():
     print("🚀 Fetching deals...")
@@ -53,16 +47,15 @@ def get_deals():
             title = item.get_text(strip=True)
             link = "https://www.amazon.in" + item.get("href", "")
 
-            if len(title) < 20:
+            # skip garbage titles
+            if len(title) < 10:
                 continue
 
-            price = 999  # placeholder
-            original_price = 1999  # placeholder
+            # TEMP TEST PRICES (to ensure output)
+            price = 499
+            original_price = 999
 
             discount = int((original_price - price) / original_price * 100)
-
-            if discount < 20:
-                continue
 
             product_id = link.split("/dp/")[-1][:10] if "/dp/" in link else title[:10]
 
@@ -93,12 +86,14 @@ async def bot_loop():
 
         deals = get_deals()
 
+        if not deals:
+            print("⚠️ No deals found")
+
         for msg, pid, cat, price, discount in deals:
             try:
                 await client.send_message(CHANNEL, msg)
                 print("✅ Sent")
 
-                # analytics log
                 log_deal(pid, cat, price, discount)
 
                 await asyncio.sleep(5)
@@ -107,7 +102,7 @@ async def bot_loop():
                 print("Send error:", e)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(1800)  # 30 min
+        await asyncio.sleep(600)  # 10 min for faster testing
 
 # ===== THREAD RUNNER =====
 def run_bot():
