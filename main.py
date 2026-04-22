@@ -6,13 +6,12 @@ from flask import Flask
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-# ===== ENV VARIABLES =====
+# ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
-# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
 # ===== FLASK =====
@@ -20,10 +19,13 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running"
+    return "Bot running"
 
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
+async def run_flask():
+    from threading import Thread
+    def start():
+        app.run(host="0.0.0.0", port=10000)
+    Thread(target=start).start()
 
 # ===== SCRAPER =====
 def get_deals():
@@ -41,37 +43,13 @@ def get_deals():
 
         print(f"Products found: {len(items)}")
 
-        for item in items[:10]:
+        for item in items[:5]:
             title = item.get_text(strip=True)
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            # open product page
-            page = requests.get(link, headers=headers)
-            psoup = BeautifulSoup(page.text, "html.parser")
-
-            rating_tag = psoup.select_one(".a-icon-alt")
-            review_tag = psoup.select_one("#acrCustomerReviewText")
-
-            rating = rating_tag.get_text(strip=True) if rating_tag else ""
-            reviews = review_tag.get_text(strip=True) if review_tag else ""
-
-            try:
-                rating_value = float(rating.split()[0])
-                review_count = int(reviews.split()[0].replace(",", ""))
-            except:
-                continue
-
-            # 🔥 TEMP RELAXED FILTERS (important)
-            if rating_value < 3.5:
-                continue
-            if review_count < 100:
-                continue
-
             msg = f"""🔥 Deal
 📦 {title}
-⭐ {rating}
-📝 {reviews}
 👉 {link}
 """
 
@@ -85,29 +63,28 @@ def get_deals():
 
 # ===== MAIN =====
 async def main():
+    print("🚀 Starting bot...")
+
+    await run_flask()
+
     await client.start()
     print("🔥 Logged in successfully")
 
     while True:
         deals = get_deals()
 
-        if not deals:
-            print("❌ No deals found")
-
         for deal in deals:
             try:
-                print("📤 Sending deal...")
+                print("📤 Sending...")
                 await client.send_message(CHANNEL, deal)
                 print("✅ Sent")
                 await asyncio.sleep(5)
             except Exception as e:
                 print("Send error:", e)
 
-        print("⏳ Waiting 1 hour...")
-        await asyncio.sleep(3600)
+        print("⏳ Waiting...")
+        await asyncio.sleep(300)  # 5 minutes for testing
 
 # ===== RUN =====
 if __name__ == "__main__":
-    import threading
-    threading.Thread(target=run_flask).start()
     asyncio.run(main())
