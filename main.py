@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from flask import Flask
 from telethon import TelegramClient
 
@@ -18,6 +19,9 @@ app = Flask(__name__)
 def home():
     return "Bot is running!"
 
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
+
 # ===== TELEGRAM BOT =====
 async def telegram_bot():
     await client.start()
@@ -33,10 +37,10 @@ async def telegram_bot():
 
         await asyncio.sleep(60)
 
-# ===== RUN BOTH =====
-async def main():
-    asyncio.create_task(telegram_bot())
-    app.run(host="0.0.0.0", port=10000)
+# ===== MAIN =====
+def main():
+    threading.Thread(target=run_flask).start()
+    asyncio.run(telegram_bot())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
