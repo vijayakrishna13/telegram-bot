@@ -32,7 +32,7 @@ app = Flask(__name__)
 def home():
     return "Bot is running"
 
-# ===== DISCOUNT CALC =====
+# ===== DISCOUNT =====
 def calculate_discount(text):
     prices = re.findall(r'₹\s?(\d+)', text)
 
@@ -72,6 +72,19 @@ def is_good_deal(text):
 
     return True
 
+# ===== BESTSELLER =====
+def is_bestseller(link):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(link, headers=headers, timeout=10)
+        html = res.text.lower()
+
+        keywords = ["best seller", "#1", "bestseller"]
+
+        return any(k in html for k in keywords)
+    except:
+        return False
+
 # ===== COPYWRITING =====
 def format_message(text, link):
     discount_data = calculate_discount(text)
@@ -83,6 +96,7 @@ def format_message(text, link):
 
 💰 Price: ₹{deal} (MRP ₹{mrp})
 📉 Discount: {discount}% OFF
+⭐ Bestseller Product
 
 ⚡ Limited Time Offer
 
@@ -123,11 +137,16 @@ def get_amazon_deals():
             if product_id in sent_products:
                 continue
 
+            # Bestseller check
+            if not is_bestseller(link):
+                continue
+
             sent_products.add(product_id)
             with open(FILE_NAME, "a") as f:
                 f.write(product_id + "\n")
 
-            formatted = format_message("amazon deal ₹1000 ₹2000", link)
+            # dummy text for discount format
+            formatted = format_message("₹1000 ₹2000", link)
             deals.append(formatted)
 
             if len(deals) >= 3:
@@ -142,7 +161,7 @@ def get_amazon_deals():
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
-    source_channels = ["offerzone3_0"]  # ensure you joined this
+    source_channels = ["offerzone3_0"]
     deals = []
 
     for channel in source_channels:
@@ -167,6 +186,10 @@ async def get_telegram_deals():
                 product_id = link.split("/dp/")[1].split("/")[0]
 
                 if product_id in sent_products:
+                    continue
+
+                # Bestseller check
+                if not is_bestseller(link):
                     continue
 
                 sent_products.add(product_id)
