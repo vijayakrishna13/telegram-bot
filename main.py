@@ -11,7 +11,7 @@ TARGET_CHANNEL = "https://t.me/loot_deals_india_vj"
 
 client = TelegramClient("user_session", api_id, api_hash)
 
-# ===== FLASK (for Render free plan) =====
+# ===== FLASK (keeps Render alive) =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -21,19 +21,16 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== YOUR LOGIC (temporary test) =====
+# ===== YOUR LOGIC (TEST VERSION) =====
 def get_deals():
-    return [
-        "🔥 Test Deal: Product 1 - ₹999 👉 https://example.com",
-        "🔥 Test Deal: Product 2 - ₹499 👉 https://example.com"
-    ]
+    return ["🔥 FINAL TEST DEAL"]
 
 # ===== TELEGRAM BOT =====
 async def run_bot():
     await client.start()
     print("🔥 Logged in successfully")
 
-    posted = set()  # prevent duplicates
+    posted = set()
 
     while True:
         print("🔍 Running your logic...")
