@@ -1,9 +1,8 @@
 import asyncio
-import threading
 from flask import Flask
 from telethon import TelegramClient
 
-# ===== TELEGRAM CONFIG =====
+# ===== CONFIG =====
 api_id = 34165554
 api_hash = "6879f17a50febfb32f9264b7300a8066"
 
@@ -12,15 +11,12 @@ TARGET_CHANNEL = "loot_deals_india_vj"
 
 client = TelegramClient("user_session", api_id, api_hash)
 
-# ===== FLASK (for Render) =====
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running!"
-
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
 
 # ===== TELEGRAM BOT =====
 async def telegram_bot():
@@ -38,9 +34,9 @@ async def telegram_bot():
         await asyncio.sleep(60)
 
 # ===== RUN BOTH =====
-def main():
-    threading.Thread(target=run_flask).start()
-    asyncio.run(telegram_bot())
+async def main():
+    asyncio.create_task(telegram_bot())
+    app.run(host="0.0.0.0", port=10000)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
