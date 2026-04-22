@@ -3,7 +3,7 @@ from telethon import TelegramClient
 
 api_id = 34165554
 api_hash = "6879f17a50febfb32f9264b7300a8066"
-BOT_TOKEN = "AAE0xs3TcGr-Zz8eDYrAhOsnxqfn455jJM0"
+BOT_TOKEN = "YOUR_NEW_TOKEN"
 
 SOURCE_CHANNEL = "loot_deals"
 TARGET_CHANNEL = "loot_deals_india_vj"
@@ -16,22 +16,17 @@ async def main():
     await client.start(bot_token=BOT_TOKEN)
 
     while True:
-        try:
-            print("🔍 Checking source channel...")
+        print("🔍 Checking source channel...")
 
-            async for message in client.iter_messages(SOURCE_CHANNEL, limit=5):
-                if message.text:
-                    text = message.text
+        async for message in client.iter_messages(SOURCE_CHANNEL, limit=5):
+            if message.text:
+                await client.send_message(TARGET_CHANNEL, message.text)
+                print("📤 Posted")
 
-                    if "₹" in text or "Rs" in text:
-                        await client.send_message(TARGET_CHANNEL, text)
-                        print("📤 Posted")
+        await asyncio.sleep(60)
 
-            await asyncio.sleep(60)
+async def run():
+    async with client:
+        await main()
 
-        except Exception as e:
-            print("❌ Error:", e)
-            await asyncio.sleep(10)
-
-with client:
-    client.loop.run_until_complete(main())
+asyncio.run(run())
