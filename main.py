@@ -11,7 +11,7 @@ TARGET_CHANNEL = "https://t.me/loot_deals_india_vj"
 
 client = TelegramClient("user_session", api_id, api_hash)
 
-# ===== FLASK (keeps Render alive) =====
+# ===== FLASK (for Render free plan) =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -21,8 +21,9 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== YOUR LOGIC (TEST VERSION) =====
+# ===== YOUR LOGIC =====
 def get_deals():
+    # temporary (replace later with Amazon scraping)
     return ["🔥 FINAL TEST DEAL"]
 
 # ===== TELEGRAM BOT =====
@@ -47,7 +48,7 @@ async def run_bot():
 
 # ===== MAIN =====
 def main():
-    threading.Thread(target=run_flask).start()
+    threading.Thread(target=run_flask, daemon=True).start()
     asyncio.run(run_bot())
 
 if __name__ == "__main__":
