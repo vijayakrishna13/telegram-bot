@@ -146,7 +146,7 @@ async def bot_loop():
                 print("Send error:", e)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(1800)
+        await asyncio.sleep(60)
 
 # ===== THREAD =====
 def run_bot():
