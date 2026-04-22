@@ -11,7 +11,7 @@ TARGET_CHANNEL = "https://t.me/loot_deals_india_vj"
 
 client = TelegramClient("user_session", api_id, api_hash)
 
-# ===== FLASK =====
+# ===== FLASK (for Render free plan) =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -21,14 +21,19 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== YOUR AMAZON LOGIC (KEEP EMPTY FOR NOW) =====
+# ===== YOUR LOGIC (temporary test) =====
 def get_deals():
-    return ["Test deal message"]  # temporary test
+    return [
+        "🔥 Test Deal: Product 1 - ₹999 👉 https://example.com",
+        "🔥 Test Deal: Product 2 - ₹499 👉 https://example.com"
+    ]
 
 # ===== TELEGRAM BOT =====
 async def run_bot():
     await client.start()
     print("🔥 Logged in successfully")
+
+    posted = set()  # prevent duplicates
 
     while True:
         print("🔍 Running your logic...")
@@ -36,17 +41,16 @@ async def run_bot():
         deals = get_deals()
 
         for deal in deals:
-            await client.send_message(TARGET_CHANNEL, deal)
-            print("📤 Posted:", deal)
+            if deal not in posted:
+                await client.send_message(TARGET_CHANNEL, deal)
+                posted.add(deal)
+                print("📤 Posted:", deal)
 
         await asyncio.sleep(60)
 
 # ===== MAIN =====
 def main():
-    # Start Flask in background
     threading.Thread(target=run_flask).start()
-
-    # Start Telegram bot (MAIN thread)
     asyncio.run(run_bot())
 
 if __name__ == "__main__":
