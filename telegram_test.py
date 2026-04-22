@@ -4,26 +4,27 @@ import asyncio
 from flask import Flask
 import threading
 
-# ================== KEEP ALIVE SERVER ==================
+# ================== KEEP ALIVE ==================
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running"
+    return "Bot running"
 
 def run_web():
     app.run(host="0.0.0.0", port=10000)
 
-# ================== TELEGRAM CONFIG ==================
+# ================== CONFIG ==================
 api_id = 34165554
 api_hash = '6879f17a50febfb32f9264b7300a8066'
+bot_token = 'AAE0xs3TcGr-Zz8eDYrAhOsnxqfn455jJM0'
 
-SOURCE_CHANNEL = 'loot_deals'   # source channel username
-TARGET_CHANNEL = 'loot_deals_india_vj'  # your channel username
+SOURCE_CHANNEL = 'loot_deals'
+TARGET_CHANNEL = 'loot_deals_india_vj'
 
-client = TelegramClient('/opt/render/project/src/session', api_id, api_hash)
+client = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
-# ================== AFFILIATE ==================
+# ================== HELPERS ==================
 def convert_to_affiliate(link):
     if "amazon.in" in link:
         if "tag=" in link:
@@ -31,7 +32,6 @@ def convert_to_affiliate(link):
         return link + "?tag=lootdealsvj21-21"
     return link
 
-# ================== EXTRACT ==================
 def extract_data(text):
     link_match = re.search(r'https?://\S+', text)
     link = link_match.group() if link_match else ""
@@ -40,23 +40,16 @@ def extract_data(text):
     price = price_match.group() if price_match else ""
 
     product = text.split('\n')[0]
-
     return product, price, link
 
-# ================== MAIN BOT ==================
+# ================== MAIN ==================
 async def main():
-    await client.start()
-
-    if not await client.is_user_authorized():
-        print("❌ Session not authorized")
-        return
-
     print("✅ Bot started")
 
     entity = await client.get_entity(TARGET_CHANNEL)
 
     while True:
-        print("\n🔍 Checking source channel...")
+        print("🔍 Checking source channel...")
 
         async for message in client.iter_messages(SOURCE_CHANNEL, limit=50):
             try:
@@ -65,7 +58,6 @@ async def main():
 
                 product, price, link = extract_data(message.text)
 
-                # ✅ Filter only Amazon
                 if not link or "amazon.in" not in link:
                     continue
 
