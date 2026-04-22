@@ -21,7 +21,7 @@ api_hash = '6879f17a50febfb32f9264b7300a8066'
 SOURCE_CHANNEL = 'loot_deals'   # source channel username
 TARGET_CHANNEL = 'loot_deals_india_vj'  # your channel username
 
-client = TelegramClient('session', api_id, api_hash)
+client = TelegramClient('/opt/render/project/src/session', api_id, api_hash)
 
 # ================== AFFILIATE ==================
 def convert_to_affiliate(link):
@@ -45,7 +45,7 @@ def extract_data(text):
 
 # ================== MAIN BOT ==================
 async def main():
-    await client.start()
+    await client.connect()
     print("✅ Bot started")
 
     entity = await client.get_entity(TARGET_CHANNEL)
