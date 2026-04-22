@@ -6,6 +6,7 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from flask import Flask
 import threading
+import re
 
 # ===== ENV =====
 API_ID = int(os.getenv("API_ID"))
@@ -27,7 +28,7 @@ sent_links = set()
 
 # ===== SCRAPER =====
 def get_deals():
-    print("🚀 Fetching smart deals...")
+    print("Fetching smart deals...")
 
     headers = {"User-Agent": "Mozilla/5.0"}
     url = "https://www.amazon.in/gp/bestsellers/electronics/"
@@ -68,97 +69,61 @@ def get_deals():
 
             discount = int(((mrp - price) / mrp) * 100)
 
-            # ===== FILTER =====
+            # filter good deals only
             if discount < 30:
                 continue
 
             # ===== COUPON =====
             coupon_text = ""
+            coupon_value = 0
             coupon = psoup.find(string=lambda x: x and "coupon" in x.lower())
             if coupon:
                 coupon_text = coupon.strip()
+                match = re.search(r'₹\s?(\d+)', coupon_text)
+                if match:
+                    coupon_value = int(match.group(1))
 
             # ===== BANK =====
             bank_text = ""
+            bank_percent = 0
             bank = psoup.find(string=lambda x: x and "bank" in x.lower())
             if bank:
                 bank_text = bank.strip()
+                match = re.search(r'(\d+)%', bank_text)
+                if match:
+                    bank_percent = int(match.group(1))
 
-            # ===== MESSAGE =====
-            # ===== EXTRACT COUPON AMOUNT =====
-coupon_value = 0
-if coupon_text:
-    import re
-    match = re.search(r'₹\s?(\d+)', coupon_text)
-    if match:
-        coupon_value = int(match.group(1))
+            # ===== FINAL PRICE =====
+            final_price = price
+            final_price -= coupon_value
 
-# ===== EXTRACT BANK % =====
-bank_percent = 0
-if bank_text:
-    import re
-    match = re.search(r'(\d+)%', bank_text)
-    if match:
-        bank_percent = int(match.group(1))
+            if bank_percent > 0:
+                final_price -= int(final_price * bank_percent / 100)
 
-# ===== FINAL PRICE CALC =====
-final_price = price
+            # ===== MESSAGE (SAFE) =====
+            msg = f"""
+BEST DEAL
 
-# apply coupon
-final_price -= coupon_value
+{title[:60]}...
 
-# apply bank discount
-if bank_percent > 0:
-    final_price -= int(final_price * bank_percent / 100)
-
-# ===== MESSAGE =====
-msg = f"""🔥 BEST DEAL
-
-📦 {title[:60]}...
-
-💰 Deal Price: ₹{price}
-🏷 MRP: ₹{mrp}
-🔥 {discount}% OFF
+Deal Price: ₹{price}
+MRP: ₹{mrp}
+Discount: {discount}% OFF
 """
 
-💰 Deal Price: ₹{price}
-🏷 MRP: ₹{mrp}
-🔥 {discount}% OFF
-"""
+            if coupon_value > 0:
+                msg += f"\nCoupon: ₹{coupon_value}"
 
-if coupon_value > 0:
-    msg += f"\n🎟 Coupon: ₹{coupon_value}"
-
-if bank_percent > 0:
-    msg += f"\n🏦 Bank: {bank_percent}% OFF"
-
-msg += f"""
-
-💸 FINAL PRICE: ₹{final_price} ✅
-
-⚡ Limited time deal
-
-👉 {link}
-"""
-
-📦 {title[:60]}...
-
-💰 ₹{price} (Worth ₹{mrp})
-🔥 {discount}% OFF
-"""
-
-            if coupon_text:
-                msg += f"\n🎟 {coupon_text}"
-
-            if bank_text:
-                msg += f"\n🏦 {bank_text}"
+            if bank_percent > 0:
+                msg += f"\nBank Offer: {bank_percent}% OFF"
 
             msg += f"""
 
-👉 Final price may drop further
-⚡ Limited time deal
+FINAL PRICE: ₹{final_price}
 
-👉 {link}
+Limited time deal
+
+{link}
 """
 
             deals.append(msg)
@@ -175,27 +140,26 @@ msg += f"""
 
 # ===== BOT LOOP =====
 async def bot_loop():
-    print("🚀 BOT STARTED")
-
+    print("BOT STARTED")
     await client.start()
 
     while True:
-        print("🔁 Running cycle...")
+        print("Running cycle...")
 
         deals = get_deals()
 
         if not deals:
-            print("❌ No good deals found")
+            print("No good deals found")
 
         for deal in deals:
             try:
                 await client.send_message(CHANNEL, deal)
-                print("✅ Sent")
+                print("Sent")
                 await asyncio.sleep(5)
             except Exception as e:
                 print("Send error:", e)
 
-        print("⏳ Sleeping...\n")
+        print("Sleeping...\n")
         await asyncio.sleep(1800)
 
 # ===== THREAD =====
@@ -205,7 +169,7 @@ def run_bot():
 
 # ===== MAIN =====
 if __name__ == "__main__":
-    print("🔥 Starting system...")
+    print("Starting system...")
 
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.start()
