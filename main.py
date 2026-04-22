@@ -4,7 +4,7 @@ from telethon import TelegramClient
 # 🔑 Your credentials
 api_id = 34165554
 api_hash = "6879f17a50febfb32f9264b7300a8066"
-BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = "8693066458:AAE0xs3TcGr-Zz8eDYrAhOsnxqfn455jJM0"
 
 # 📢 Channels
 SOURCE_CHANNEL = "loot_deals"
