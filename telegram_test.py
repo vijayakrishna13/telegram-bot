@@ -3,7 +3,7 @@ from telethon import TelegramClient
 
 api_id = 34165554
 api_hash = "6879f17a50febfb32f9264b7300a8066"
-BOT_TOKEN = "PASTE_YOUR_NEW_TOKEN_HERE"
+BOT_TOKEN = "AAE0xs3TcGr-Zz8eDYrAhOsnxqfn455jJM0"
 
 SOURCE_CHANNEL = "loot_deals"
 TARGET_CHANNEL = "loot_deals_india_vj"
