@@ -73,7 +73,7 @@ def get_deals():
                 continue
             if reviews < 500:
                 continue
-            if discount < 30:
+            if discount < 20:
                 continue
 
             # ===== COUPON =====
