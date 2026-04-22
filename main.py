@@ -32,43 +32,31 @@ app = Flask(__name__)
 def home():
     return "Bot is running"
 
-# ===== DISCOUNT =====
-def calculate_discount(text):
+# ===== PRICE LOGIC =====
+def extract_price_data(text):
     prices = re.findall(r'₹\s?(\d+)', text)
 
     if len(prices) >= 2:
         try:
-            mrp = int(prices[1])
             deal = int(prices[0])
+            mrp = int(prices[1])
 
             if mrp > deal:
                 discount = int(((mrp - deal) / mrp) * 100)
-                return discount, deal, mrp
+                return deal, mrp, discount
         except:
             return None
 
     return None
 
-# ===== FILTER =====
-def is_good_deal(text):
-    text = text.lower()
-
-    if "amazon" not in text:
+# ===== PRICE VALIDATION =====
+def is_real_discount(deal, mrp, discount):
+    if discount < 40:
         return False
 
-    if "₹" not in text:
+    # fake MRP detection
+    if mrp > deal * 3:  # unrealistic inflated price
         return False
-
-    bad_words = ["earn", "crypto", "bet", "loan", "adult"]
-    if any(word in text for word in bad_words):
-        return False
-
-    discount_data = calculate_discount(text)
-
-    if discount_data:
-        discount, deal, mrp = discount_data
-        if discount < 30:
-            return False
 
     return True
 
@@ -80,38 +68,27 @@ def is_bestseller(link):
         html = res.text.lower()
 
         keywords = ["best seller", "#1", "bestseller"]
-
         return any(k in html for k in keywords)
+
     except:
         return False
 
 # ===== COPYWRITING =====
-def format_message(text, link):
-    discount_data = calculate_discount(text)
+def format_message(deal, mrp, discount, link):
+    return f"""🔥 MEGA DEAL
 
-    if discount_data:
-        discount, deal, mrp = discount_data
+💰 Deal Price: ₹{deal}
+🏷 MRP: ₹{mrp}
+📉 OFF: {discount}%
 
-        msg = f"""🔥 MEGA DEAL
-
-💰 Price: ₹{deal} (MRP ₹{mrp})
-📉 Discount: {discount}% OFF
 ⭐ Bestseller Product
-
-⚡ Limited Time Offer
-
-👉 Buy Now:
-{link}
-"""
-    else:
-        msg = f"""🔥 HOT DEAL
+⚡ Real Price Drop
 
 👉 Buy Now:
 {link}
 """
-    return msg
 
-# ===== AMAZON =====
+# ===== AMAZON SCRAPER =====
 def get_amazon_deals():
     print("Fetching Amazon deals...")
 
@@ -137,7 +114,18 @@ def get_amazon_deals():
             if product_id in sent_products:
                 continue
 
-            # Bestseller check
+            # FAKE TEXT (we improve later)
+            text = "₹1000 ₹2000"
+
+            price_data = extract_price_data(text)
+            if not price_data:
+                continue
+
+            deal, mrp, discount = price_data
+
+            if not is_real_discount(deal, mrp, discount):
+                continue
+
             if not is_bestseller(link):
                 continue
 
@@ -145,9 +133,7 @@ def get_amazon_deals():
             with open(FILE_NAME, "a") as f:
                 f.write(product_id + "\n")
 
-            # dummy text for discount format
-            formatted = format_message("₹1000 ₹2000", link)
-            deals.append(formatted)
+            deals.append(format_message(deal, mrp, discount, link))
 
             if len(deals) >= 3:
                 break
@@ -157,7 +143,7 @@ def get_amazon_deals():
 
     return deals
 
-# ===== TELEGRAM =====
+# ===== TELEGRAM SCRAPER =====
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
@@ -171,7 +157,7 @@ async def get_telegram_deals():
                 if not message.text:
                     continue
 
-                if not is_good_deal(message.text):
+                if "₹" not in message.text:
                     continue
 
                 links = re.findall(r'https?://\S+', message.text)
@@ -188,7 +174,15 @@ async def get_telegram_deals():
                 if product_id in sent_products:
                     continue
 
-                # Bestseller check
+                price_data = extract_price_data(message.text)
+                if not price_data:
+                    continue
+
+                deal, mrp, discount = price_data
+
+                if not is_real_discount(deal, mrp, discount):
+                    continue
+
                 if not is_bestseller(link):
                     continue
 
@@ -196,8 +190,7 @@ async def get_telegram_deals():
                 with open(FILE_NAME, "a") as f:
                     f.write(product_id + "\n")
 
-                formatted = format_message(message.text, link)
-                deals.append(formatted)
+                deals.append(format_message(deal, mrp, discount, link))
 
                 if len(deals) >= 5:
                     break
@@ -216,13 +209,13 @@ async def bot_loop():
     while True:
         print("Running cycle...")
 
-        amazon_deals = get_amazon_deals()
-        telegram_deals = await get_telegram_deals()
+        amazon = get_amazon_deals()
+        telegram = await get_telegram_deals()
 
-        all_deals = amazon_deals + telegram_deals
+        all_deals = amazon + telegram
 
         if not all_deals:
-            print("No deals found")
+            print("No good deals found")
 
         for deal in all_deals:
             try:
@@ -243,8 +236,7 @@ def run_bot():
 if __name__ == "__main__":
     print("Starting system...")
 
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
+    threading.Thread(target=run_bot).start()
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
