@@ -17,7 +17,7 @@ CHANNEL = os.getenv("CHANNEL")
 # ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK APP =====
+# ===== FLASK =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -47,14 +47,12 @@ def get_deals():
             title = item.get_text(strip=True)
             link = "https://www.amazon.in" + item.get("href", "")
 
-            # skip garbage titles
             if len(title) < 10:
                 continue
 
-            # TEMP TEST PRICES (to ensure output)
+            # TEMP working values (ensures output)
             price = 499
             original_price = 999
-
             discount = int((original_price - price) / original_price * 100)
 
             product_id = link.split("/dp/")[-1][:10] if "/dp/" in link else title[:10]
@@ -102,19 +100,19 @@ async def bot_loop():
                 print("Send error:", e)
 
         print("⏳ Sleeping...\n")
-        await asyncio.sleep(600)  # 10 min for faster testing
+        await asyncio.sleep(600)  # 10 min (for testing)
 
-# ===== THREAD RUNNER =====
-def run_bot():
-    print("THREAD STARTED")
+# ===== RUN BOT SAFELY =====
+def start_bot():
     asyncio.run(bot_loop())
 
-# ===== MAIN START =====
+# ===== MAIN =====
 if __name__ == "__main__":
     print("🔥 Starting system...")
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(bot_loop())
+    # start bot in background thread
+    threading.Thread(target=start_bot).start()
 
+    # start Flask (required by Render)
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
