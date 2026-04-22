@@ -24,18 +24,18 @@ def home():
     return "Bot is running"
 
 # ===== MEMORY =====
-sent_links = set()
+sent_products = set()
 
-# ===== SCRAPER =====
-def get_deals():
-    print("Fetching smart deals...")
+# ===== AMAZON SCRAPER =====
+def get_amazon_deals():
+    print("Fetching Amazon deals...")
 
     headers = {"User-Agent": "Mozilla/5.0"}
     url = "https://www.amazon.in/gp/bestsellers/electronics/"
     deals = []
 
     try:
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
         items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
@@ -45,113 +45,93 @@ def get_deals():
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            if link in sent_links:
+            # extract product id
+            product_id = link.split("/dp/")[1].split("/")[0] if "/dp/" in link else link
+
+            if product_id in sent_products:
                 continue
 
-            # open product page
-            page = requests.get(link, headers=headers)
-            psoup = BeautifulSoup(page.text, "html.parser")
+            deals.append(f"Amazon Deal:\n{title}\n{link}")
+            sent_products.add(product_id)
 
-            price_tag = psoup.select_one(".a-price-whole")
-            mrp_tag = psoup.select_one(".a-text-price span")
-
-            if not price_tag or not mrp_tag:
-                continue
-
-            try:
-                price = int(price_tag.get_text().replace(",", ""))
-                mrp = int(mrp_tag.get_text().replace("₹", "").replace(",", ""))
-            except:
-                continue
-
-            if mrp == 0:
-                continue
-
-            discount = int(((mrp - price) / mrp) * 100)
-
-            # filter good deals only
-            if discount < 30:
-                continue
-
-            # ===== COUPON =====
-            coupon_text = ""
-            coupon_value = 0
-            coupon = psoup.find(string=lambda x: x and "coupon" in x.lower())
-            if coupon:
-                coupon_text = coupon.strip()
-                match = re.search(r'₹\s?(\d+)', coupon_text)
-                if match:
-                    coupon_value = int(match.group(1))
-
-            # ===== BANK =====
-            bank_text = ""
-            bank_percent = 0
-            bank = psoup.find(string=lambda x: x and "bank" in x.lower())
-            if bank:
-                bank_text = bank.strip()
-                match = re.search(r'(\d+)%', bank_text)
-                if match:
-                    bank_percent = int(match.group(1))
-
-            # ===== FINAL PRICE =====
-            final_price = price
-            final_price -= coupon_value
-
-            if bank_percent > 0:
-                final_price -= int(final_price * bank_percent / 100)
-
-            # ===== MESSAGE (SAFE) =====
-            msg = f"""
-BEST DEAL
-
-{title[:60]}...
-
-Deal Price: ₹{price}
-MRP: ₹{mrp}
-Discount: {discount}% OFF
-"""
-
-            if coupon_value > 0:
-                msg += f"\nCoupon: ₹{coupon_value}"
-
-            if bank_percent > 0:
-                msg += f"\nBank Offer: {bank_percent}% OFF"
-
-            msg += f"""
-
-FINAL PRICE: ₹{final_price}
-
-Limited time deal
-
-{link}
-"""
-
-            deals.append(msg)
-            sent_links.add(link)
-
-            if len(deals) >= 5:
+            if len(deals) >= 3:
                 break
 
     except Exception as e:
-        print("Error:", e)
+        print("Amazon error:", e)
 
-    print("Deals found:", len(deals))
+    return deals
+
+# ===== TELEGRAM SCRAPER =====
+async def get_telegram_deals():
+    print("Fetching Telegram deals...")
+
+    source_channels = [
+        "loot_deals_india",
+        "amazon_deals_india"
+    ]
+
+    deals = []
+
+    for channel in source_channels:
+        try:
+            async for message in client.iter_messages(channel, limit=20):
+
+                if not message.text:
+                    continue
+
+                text = message.text.lower()
+
+                if "amazon" not in text:
+                    continue
+
+                links = re.findall(r'https?://\S+', message.text)
+                if not links:
+                    continue
+
+                link = links[0]
+
+                # extract product id
+                if "/dp/" in link:
+                    product_id = link.split("/dp/")[1].split("/")[0]
+                else:
+                    product_id = link
+
+                if product_id in sent_products:
+                    continue
+
+                sent_products.add(product_id)
+
+                clean_msg = message.text[:400]
+
+                deals.append(clean_msg)
+
+                if len(deals) >= 3:
+                    break
+
+        except Exception as e:
+            print("Telegram error:", e)
+
     return deals
 
 # ===== BOT LOOP =====
 async def bot_loop():
     print("BOT STARTED")
+
     await client.start()
 
     while True:
         print("Running cycle...")
 
-        deals = get_deals()
+        amazon_deals = get_amazon_deals()
+        telegram_deals = await get_telegram_deals()
 
-        if not deals:
-            print("No good deals found")
+        all_deals = amazon_deals + telegram_deals
 
-        for deal in deals:
+        if not all_deals:
+            print("No deals found")
+
+        for deal in all_deals:
             try:
                 await client.send_message(CHANNEL, deal)
                 print("Sent")
@@ -164,7 +144,6 @@ async def bot_loop():
 
 # ===== THREAD =====
 def run_bot():
-    print("THREAD STARTED")
     asyncio.run(bot_loop())
 
 # ===== MAIN =====
