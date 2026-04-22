@@ -8,15 +8,16 @@ from flask import Flask
 import threading
 import re
 
-# ===== ENV =====
+# ===== ENV VARIABLES =====
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 CHANNEL = os.getenv("CHANNEL")
 
+# ===== TELEGRAM CLIENT =====
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ===== FLASK =====
+# ===== FLASK (RENDER KEEP ALIVE) =====
 app = Flask(__name__)
 
 @app.route("/")
@@ -26,33 +27,58 @@ def home():
 # ===== MEMORY =====
 sent_products = set()
 
+# ===== SMART FILTER =====
+def is_good_deal(text):
+    text = text.lower()
+
+    if "amazon" not in text:
+        return False
+
+    if "₹" not in text:
+        return False
+
+    bad_words = ["earn", "crypto", "bet", "loan", "adult"]
+    if any(word in text for word in bad_words):
+        return False
+
+    price_match = re.search(r'₹\s?(\d+)', text)
+    if price_match:
+        price = int(price_match.group(1))
+        if price < 100:
+            return False
+
+    return True
+
 # ===== AMAZON SCRAPER =====
 def get_amazon_deals():
     print("Fetching Amazon deals...")
 
     headers = {"User-Agent": "Mozilla/5.0"}
-    url = "https://www.amazon.in/gp/bestsellers/electronics/"
+    url = "https://www.amazon.in/deals"
     deals = []
 
     try:
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
+        links = soup.find_all("a", href=True)
 
-        for item in items[:10]:
-            title = item.get_text(strip=True)
-            parent = item.find_parent("a")
-            link = "https://www.amazon.in" + parent["href"] if parent else ""
+        for a in links:
+            href = a["href"]
 
-            # extract product id
-            product_id = link.split("/dp/")[1].split("/")[0] if "/dp/" in link else link
+            if "/dp/" not in href:
+                continue
+
+            link = "https://www.amazon.in" + href.split("?")[0]
+
+            product_id = link.split("/dp/")[1].split("/")[0]
 
             if product_id in sent_products:
                 continue
 
-            deals.append(f"Amazon Deal:\n{title}\n{link}")
             sent_products.add(product_id)
+
+            deals.append(f"🔥 Amazon Deal\n👉 {link}")
 
             if len(deals) >= 3:
                 break
@@ -66,23 +92,18 @@ def get_amazon_deals():
 async def get_telegram_deals():
     print("Fetching Telegram deals...")
 
-    source_channels = [
-        "loot_deals_india",
-        "amazon_deals_india"
-    ]
+    source_channels = ["offerzone3_0"]  # ← update if needed
 
     deals = []
 
     for channel in source_channels:
         try:
-            async for message in client.iter_messages(channel, limit=20):
+            async for message in client.iter_messages(channel, limit=30):
 
                 if not message.text:
                     continue
 
-                text = message.text.lower()
-
-                if "amazon" not in text:
+                if not is_good_deal(message.text):
                     continue
 
                 links = re.findall(r'https?://\S+', message.text)
@@ -91,11 +112,10 @@ async def get_telegram_deals():
 
                 link = links[0]
 
-                # extract product id
-                if "/dp/" in link:
-                    product_id = link.split("/dp/")[1].split("/")[0]
-                else:
-                    product_id = link
+                if "/dp/" not in link:
+                    continue
+
+                product_id = link.split("/dp/")[1].split("/")[0]
 
                 if product_id in sent_products:
                     continue
@@ -106,7 +126,7 @@ async def get_telegram_deals():
 
                 deals.append(clean_msg)
 
-                if len(deals) >= 3:
+                if len(deals) >= 5:
                     break
 
         except Exception as e:
@@ -140,7 +160,7 @@ async def bot_loop():
                 print("Send error:", e)
 
         print("Sleeping...\n")
-        await asyncio.sleep(1800)
+        await asyncio.sleep(1800)  # 30 min
 
 # ===== THREAD =====
 def run_bot():
