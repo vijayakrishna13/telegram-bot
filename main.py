@@ -25,7 +25,7 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# ===== SCRAPER =====
+# ===== SMART DEAL SCRAPER =====
 def get_deals():
     headers = {"User-Agent": "Mozilla/5.0"}
     url = "https://www.amazon.in/gp/bestsellers/electronics/"
@@ -37,15 +37,40 @@ def get_deals():
 
         items = soup.select("._cDEzb_p13n-sc-css-line-clamp-3_g3dy1")
 
-        for item in items[:5]:
+        for item in items[:10]:
             title = item.get_text(strip=True)
             parent = item.find_parent("a")
             link = "https://www.amazon.in" + parent["href"] if parent else ""
 
-            msg = f"""🔥 Bestseller
+            # visit product page
+            page = requests.get(link, headers=headers)
+            psoup = BeautifulSoup(page.text, "html.parser")
+
+            rating_tag = psoup.select_one(".a-icon-alt")
+            review_tag = psoup.select_one("#acrCustomerReviewText")
+
+            rating = rating_tag.get_text(strip=True) if rating_tag else ""
+            reviews = review_tag.get_text(strip=True) if review_tag else ""
+
+            try:
+                rating_value = float(rating.split()[0])
+                review_count = int(reviews.split()[0].replace(",", ""))
+            except:
+                continue
+
+            # ✅ SMART FILTERS
+            if rating_value < 4.0:
+                continue
+            if review_count < 1000:
+                continue
+
+            msg = f"""🔥 Real Deal
 📦 {title}
+⭐ {rating}
+📝 {reviews}
 👉 {link}
 """
+
             deals.append(msg)
 
     except Exception as e:
